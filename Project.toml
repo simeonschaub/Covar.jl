@@ -1,0 +1,7 @@
+name = "Covar"
+uuid = "83712d7e-0529-11e9-26ba-ef5ea36ad5b8"
+authors = ["Simeon Schaub <simeondavidschaub99@gmail.com>"]
+version = "1.0.0"
+
+[deps]
+DiffRules = "b552c78f-8df3-52c6-915a-8e097449b14b"
