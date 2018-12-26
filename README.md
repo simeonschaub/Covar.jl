@@ -65,6 +65,17 @@ f({xᵢ}) = 1.0 ± 0.0
   {Vₘ} = Array{Float64,2}[[0.3 0.1; 0.1 0.4], [1.2 0.3 0.1; 0.3 0.5 0.2; 0.1 0.2 0.6]]
 ```
 
+The methods `val` and `err` return the value or error of either a `CovariantVar` or `DerivedVar`:
+```julia
+julia> x = a^2 + 3b
+f({xᵢ}) = 13.0 ± 3.286335345030997
+  {∇⃗f} = Array{Float64,1}[[4.0, 3.0]]
+  {Vₘ} = Array{Float64,2}[[0.3 0.1; 0.1 0.4]]
+
+julia> val(x), err(x)
+(13.0, 3.286335345030997)
+```
+
 ## TODO
 * Write Tests
 * Add support for SpecialFunctions and NaNMath via `Require.jl`
