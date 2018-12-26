@@ -74,6 +74,10 @@ for i ∈ diffrules()
         end
 
         quote
+            # More of a hack, some ranges don't work otherwise
+            $pkg.$f(x::CorrelatedVar, y::Base.TwicePrecision) = $f(x, convert(AbstractFloat, y))
+            $pkg.$f(x::Base.TwicePrecision, y::CorrelatedVar) = $f(convert(AbstractFloat, x), y)
+
             function $pkg.$f(x::DerivedVar{T}, y::DerivedVar{U}) where {T,U}
                 grads, systems = merge_systems(x, y,
                                                $(df(:(val(x)), :(val(y)))[1]),
