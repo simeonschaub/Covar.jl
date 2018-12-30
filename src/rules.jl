@@ -17,7 +17,7 @@ function merge_systems(x::DerivedVar{T}, y::DerivedVar{U}, dg...) where {T,U}
     for i in keys(x.systems)
         j = wherein(x.systems[i], y.systems)
         if j ≠ nothing
-            @. grads[i] += y.grads[j] * dg[2]
+            grads[i] += y.grads[j] * dg[2]
             from_y[j] = false
         end
     end
@@ -25,6 +25,24 @@ function merge_systems(x::DerivedVar{T}, y::DerivedVar{U}, dg...) where {T,U}
     return vcat(grads, [ grad .* dg[2] for grad in y.grads[from_y] ]),
            vcat(x.systems, y.systems[from_y])
 end
+
+#function merge_systems(x::DerivedVar{T,AV1}, y::DerivedVar{U,AV2}, dg...) where
+#    {T,U,AV1<:SVector{1},AV2<:SVector{1}}
+#    
+#    grads = x.grads .* dg[1]
+#    from_y = trues(length(y.systems))
+#
+#    for i in keys(x.systems)
+#        j = wherein(x.systems[i], y.systems)
+#        if j ≠ nothing
+#            grads[i] += y.grads[j] * dg[2]
+#            from_y[j] = false
+#        end
+#    end
+#
+#    return vcat(grads, [ grad .* dg[2] for grad in y.grads[from_y] ]),
+#           vcat(x.systems, y.systems[from_y])
+#end
 
 
 for i ∈ diffrules()
@@ -43,9 +61,9 @@ for i ∈ diffrules()
                 return DerivedVar($f(val(x)), [ $(df(:(val(x)))) .* grad for grad in x.grads ], x.systems)
             end
 
-            function $pkg.$f(x::CovariantVar{T}) where T
+            function $pkg.$f(x::CovariantVar{T,AV}) where {T,AV}
                 return DerivedVar($f(val(x)),
-                                  [onehot(convert(T, $(df(:(val(x))))),
+                                  [onehot(AV, $(df(:(val(x)))),
                                           x.index, length(system(x).vals))],
                                   [x.system])
             end
@@ -88,20 +106,20 @@ for i ∈ diffrules()
             $pkg.$f(x::CovariantVar, y::DerivedVar) = $f(DerivedVar(x), y)
             $pkg.$f(x::DerivedVar, y::CovariantVar) = $f(x, DerivedVar(y))
 
-            function $pkg.$f(x::CovariantVar{T}, y::CovariantVar{U}) where {T,U}
+            function $pkg.$f(x::CovariantVar{T,AV1}, y::CovariantVar{U,AV2}) where {T,AV1,U,AV2}
                 if system(x) === system(y)
                     return DerivedVar($f(val(x), val(y)),
-                                      [ onehot(convert(T, $(df(:(val(x)), :(val(y)))[1])),
+                                      [ onehot(AV1, $(df(:(val(x)), :(val(y)))[1]),
                                                x.index, length(system(x).vals)) .+
-                                        onehot(convert(T, $(df(:(val(x)), :(val(y)))[2])),
+                                        onehot(AV2, $(df(:(val(x)), :(val(y)))[2]),
                                                y.index, length(system(y).vals)) ],
                                       [system(x)])
                 else
                     V = promote_type(T, U)
                     return DerivedVar($f(val(x), val(y)),
-                                      [ onehot(convert(V, $(df(:(val(x)), :(val(y)))[1])),
+                                      [ onehot(AV1, $(df(:(val(x)), :(val(y)))[1]),
                                                x.index, length(system(x).vals)),
-                                        onehot(convert(V, $(df(:(val(x)), :(val(y)))[2])),
+                                        onehot(AV2, $(df(:(val(x)), :(val(y)))[2]),
                                                y.index, length(system(y).vals)) ],
                                       system.([x, y]))
                 end
