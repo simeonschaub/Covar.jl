@@ -1,69 +1,5 @@
 import DiffRules: diffrule, diffrules
 
-function wherein(x::T, a::AbstractArray{T}) where T
-    for i in keys(a)
-        if a[i] === x
-            return i
-        end
-    end
-    return nothing
-end
-
-#function merge_systems(newval, x::DerivedVar{T,<:Vector}, y::DerivedVar{U}, dg...) where {T,U}
-#    
-#    grads = x.grads .* dg[1]
-#    from_y = trues(length(y.systems))
-#
-#    for i in keys(x.systems)
-#        j = wherein(x.systems[i], y.systems)
-#        if j ≠ nothing
-#            @. grads[i] += y.grads[j] * dg[2]
-#            from_y[j] = false
-#        end
-#    end
-#
-#    return DerivedVar(newval,
-#                      vcat(grads, y.grads[from_y] .* dg[2]),
-#                      vcat(x.systems, y.systems[from_y]))
-#end
-#
-#function merge_systems(newval, x::DerivedVar{T}, y::DerivedVar{U}, dg...) where {T,U}
-#    
-#    grads = x.grads .* dg[1]
-#    from_y = trues(length(y.systems))
-#
-#    for i in keys(x.systems)
-#        j = wherein(x.systems[i], y.systems)
-#        if j ≠ nothing
-#            grads[i] += y.grads[j] * dg[2]
-#            from_y[j] = false
-#        end
-#    end
-#
-#    return DerivedVar(newval,
-#                      vcat(grads, y.grads[from_y] .* dg[2]),
-#                      vcat(x.systems, y.systems[from_y]))
-#end
-#
-#function merge_systems(newval, x::DerivedVar{T,<:SVector}, y::DerivedVar{U,<:SVector},
-#                       dg...) where {T,U}
-#    
-#    grads = MVector.(x.grads .* dg[1])
-#    from_y = trues(length(y.systems))
-#
-#    for i in keys(x.systems)
-#        j = wherein(x.systems[i], y.systems)
-#        if j ≠ nothing
-#            @. grads[i] += y.grads[j] * dg[2]
-#            from_y[j] = false
-#        end
-#    end
-#
-#    return DerivedVar(newval,
-#                      vcat(SVector.(grads), y.grads[from_y] .* dg[2]),
-#                      vcat(x.systems, y.systems[from_y]))
-#end
-
 @inline function merge_systems(newval, x::DerivedVar{T}, y::DerivedVar{U}, dg...) where {T,U}
     return DerivedVar(newval, linear_combine(dg..., x.grads, y.grads))
 end
@@ -129,21 +65,22 @@ for i ∈ diffrules()
             function $pkg.$f(x::CovariantVar{T,AV1}, y::CovariantVar{U,AV2}) where {T,AV1,U,AV2}
                 if system(x) === system(y)
                     return DerivedVar($f(val(x), val(y)),
-                                      Derivatives(
+                                      Gradients(system(x),
                                         onehot(AV1, $(df(:(val(x)), :(val(y)))[1]),
                                                x.index, length(system(x).vals)) .+
                                         onehot(AV2, $(df(:(val(x)), :(val(y)))[2]),
-                                               y.index, length(system(y).vals)),
-                                        system(x)))
+                                               y.index, length(system(y).vals))
+                                      ))
                 else
-                    return DerivedVar($f(val(x), val(y)), Derivatives(
-                                    Derivatives(
+                    return DerivedVar($f(val(x), val(y)), Gradients(
+                                    Gradients(system(x),
                                         onehot(AV1, $(df(:(val(x)), :(val(y)))[1]),
                                                x.index, length(system(x).vals)),
-                                        system(x)),
+                                        ),
+                                    system(y),
                                     onehot(AV2, $(df(:(val(x)), :(val(y)))[2]),
-                                           y.index, length(system(y).vals)),
-                                    system(y)))
+                                           y.index, length(system(y).vals))
+                                    ))
                 end
             end
         end |> eval

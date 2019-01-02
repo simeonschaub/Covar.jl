@@ -79,26 +79,9 @@ Represents a variable derived from one or multiple CovariantSystems
     grads:   Gradients with respect to the corresponding CovariantSystems
     systems: The underlying CovariantSystems
 """
-struct DerivedVar{T<:AbstractFloat,G<:Gradients{<:CovariantSystem,<:AbstractVector}} <: CorrelatedVar
+struct DerivedVar{T<:AbstractFloat,G<:Gradients#={<:CovariantSystem,<:AbstractVector}=#} <: CorrelatedVar
     val::T
     grads::G
-
-    #function DerivedVar(val::T, grads::Vector{Vector{T}},
-    #                    systems::Vector{CovariantSystem}) where T<:AbstractFloat
-    #    @assert length(grads) == length(systems) "grads and systems have to be the same length"
-    #    return new{T}(val, grads, systems)
-    #end
-
-    #function DerivedVar(val::T, grads::Vector{AV},
-    #                    systems::Vector{CovariantSystem{U,}}) where {T<:AbstractFloat, U<:AbstractFloat}
-    #    @assert length(grads) == length(systems) "grads and systems have to be the same length"
-    #    return new{T}(val, grads, systems)
-    #end
-
-    function DerivedVar(val::T, grads::G) where
-        {T<:AbstractFloat,G<:Gradients{<:CovariantSystem,<:AbstractVector}}
-        return new{T,G}(val, grads)
-    end
 end
 
 val(x::DerivedVar) = x.val

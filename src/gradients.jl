@@ -23,7 +23,7 @@ function mul(c, g::Gradients)
     if isdefined(g, :parent)
         return Gradients(mul(c, g.parent), g.key, c .* g.val)
     else
-        return g#Gradients(g.key, c .* g.val)
+        return g
     end
 end
 
@@ -36,6 +36,9 @@ end
 
 #modifies g2
 function linear_combine!(∂f_∂g1, g1::Gradients, g2::Gradients)
+    if !isdefined(g2, :parent)
+        return mul(∂f_∂g1, g1)
+    end
     if isdefined(g1, :parent)
         if g2.key === g1.key
             return Gradients(linear_combine!(∂f_∂g1, g1.parent, g2.parent),
@@ -55,6 +58,6 @@ function linear_combine!(∂f_∂g1, g1::Gradients, g2::Gradients)
                              g1.key, ∂f_∂g1 .* g1.val)
 
     else
-        return g2# |> similar#Gradients(g2, g1.key, ∂f_∂g1 .* g1.val)
+        return g2
     end
 end
