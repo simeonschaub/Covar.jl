@@ -128,9 +128,9 @@ function onehot(::Type{AV}, val, i::Int, len::Int) where
 end
 
 function onehot(SV::Type{SVector{N,T}}, val, i::Int, len::Int) where {N,T<:AbstractFloat}
-    a = zeros(T, len)
+    a = zeros(MVector{N,T})
     @inbounds a[i] = val
-    return SV(a)
+    return SVector(a)
 end
 
 function onehot(SV::Type{SVector{1,T}}, val, i::Int, len::Int) where {T<:AbstractFloat}
