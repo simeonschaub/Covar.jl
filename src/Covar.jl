@@ -70,6 +70,8 @@ function Base.show(io::IO, x::CovariantVar)
 end
 
 
+include("gradients.jl")
+
 """
 Represents a variable derived from one or multiple CovariantSystems
 
@@ -77,10 +79,9 @@ Represents a variable derived from one or multiple CovariantSystems
     grads:   Gradients with respect to the corresponding CovariantSystems
     systems: The underlying CovariantSystems
 """
-struct DerivedVar{T<:AbstractFloat,AV<:AbstractVector{T}} <: CorrelatedVar
+struct DerivedVar{T<:AbstractFloat,G<:Gradients{<:CovariantSystem,<:AbstractVector}} <: CorrelatedVar
     val::T
-    grads::Vector{AV}
-    systems::Vector{CovariantSystem}
+    grads::G
 
     #function DerivedVar(val::T, grads::Vector{Vector{T}},
     #                    systems::Vector{CovariantSystem}) where T<:AbstractFloat
@@ -94,9 +95,9 @@ struct DerivedVar{T<:AbstractFloat,AV<:AbstractVector{T}} <: CorrelatedVar
     #    return new{T}(val, grads, systems)
     #end
 
-    function DerivedVar(val::T, grads::Vector{AV}, systems::Vector{CS}) where
-        {T<:AbstractFloat,AV<:AbstractVector{T},CS<:CovariantSystem}
-        return new{T,AV}(val, grads, systems)
+    function DerivedVar(val::T, grads::G) where
+        {T<:AbstractFloat,G<:Gradients{<:CovariantSystem,<:AbstractVector}}
+        return new{T,G}(val, grads)
     end
 end
 
@@ -104,8 +105,8 @@ val(x::DerivedVar) = x.val
 
 function var(x::DerivedVar{T}) where T
     var = zero(T)
-    for i in length(x.systems)
-        var += x.grads[i]' * (x.systems[i].covar * x.grads[i])
+    for (system,grad) in x.grads
+        var += grad' * (system.covar * grad)
     end
     return var
 end
@@ -114,8 +115,8 @@ err(x::CorrelatedVar) = √var(x)
 
 function Base.show(io::IO, x::DerivedVar)
     println(io, "f({xᵢ}) = $(val(x)) ± $(err(x))")
-    println(io, "  {∇⃗f} = $(x.grads)")
-    print(io, "  {Vₘ} = $([ i.covar for i in x.systems ])")
+    #println(io, "  {∇⃗f} = $(x.grads)")
+    #print(io, "  {Vₘ} = $([ i.covar for i in x.systems ])")
 end
 
 
@@ -140,9 +141,7 @@ end
 #onehot(val, i::Int, len::Int...) = onehot(float(val), i, len...)
 
 function DerivedVar(x::CovariantVar{T,AV}) where {T,AV}
-    return DerivedVar(val(x),
-                      [onehot(AV, one(T), x.index, numvals(system(x)))],
-                      [system(x)])
+    return DerivedVar(val(x), Gradients(system(x), onehot(AV, one(T), x.index, numvals(system(x)))))
 end
 
 include("rules.jl")
