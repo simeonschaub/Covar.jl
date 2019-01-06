@@ -1,23 +1,49 @@
-mutable struct Gradients{K,V} <: AbstractDict{K,V}
-    parent::Gradients{K,V}
-    key::K
+mutable struct Gradients{CS<:CovariantSystem,V} <: AbstractDict{CS,V}
+    parent::Gradients{CS,V}
+    key::CS
     val::V
 
-    Gradients{K,V}() where {K,V} = new()
-    Gradients(key::K, val::V) where {K,V} = new{K,V}(Gradients{K,V}(), key, val)
-    function Gradients(parent::Gradients{K,V}, key::K, val::V) where {K,V}
-        return new{K,V}(parent, key, val)
+    Gradients{CS,V}() where {CS<:CovariantSystem,V} = new()
+    Gradients(key::CS, val::V) where {CS<:CovariantSystem,V} = new{CS,V}(Gradients{CS,V}(), key, val)
+    function Gradients(parent::Gradients{CS,V}, key::CS, val::V) where {CS<:CovariantSystem,V}
+        return new{CS,V}(parent, key, val)
     end
 end
 
-Base.length(t::Gradients) = count(x->true, t)
-
-function Base.iterate(grads::Gradients{K,V}, t=grads) where {K,V}
-    isdefined(t, :parent) || return nothing
-    return Pair{K,V}(t.key, t.val), t.parent
+@generated function Gradients(parent::Gradients{CS,W}, key::CS, val::V) where {CS<:CovariantSystem,V,W}
+    valtype = promote_type(V, W)
+    newval = convert(valtype, val)
+    newparent = convert(Gradients{CS,valtype}, parent)
+    return Gradients(newparent, key, newval)
 end
 
-similar(::Gradients{K,V}) where {K,V} = Gradients{K,V}()
+#function Gradients(parent::Gradients{<:CovariantSystem,W}, key::CS, val::V) where {CS<:CovariantSystem,V,W}
+#    return Gradients(parent, key::CovariantSystem, val)
+#end
+
+Base.length(t::Gradients) = count(x->true, t)
+
+function Base.iterate(grads::Gradients{CS,V}, t=grads) where {CS<:CovariantSystem,V}
+    isdefined(t, :parent) || return nothing
+    return Pair{CS,V}(t.key, t.val), t.parent
+end
+
+similar(::Gradients{CS,V}) where {CS,V} = Gradients{CS,V}()
+
+function Base.convert(GT::Type{Gradients{CS,T}}, g::Gradients{CS,U}) where {CS,T,U}
+    if isdefined(g, :parent)
+        return Gradients(convert(GT, g.parent), g.key, convert(T, g.val))
+    else
+        return g
+    end
+end
+
+@inline Base.convert(::Type{Gradients{CS,T}}, g::Gradients{CS,T}) where {CS,T} = g
+
+function promote_rule(::Type{Gradients{CS,T}}, ::Type{Gradients{CS,U}}) where {CS,T,U}
+    return Gradients{CS,promote_type(T,U)}
+end
+
 
 function mul(c, g::Gradients)
     if isdefined(g, :parent)

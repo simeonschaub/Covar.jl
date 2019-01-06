@@ -22,7 +22,7 @@ for i ∈ diffrules()
             end
 
             function $pkg.$f(x::CovariantVar{T,AV}) where {T,AV}
-                return DerivedVar($f(val(x)), Gradients(x.system, onehot(AV, $(df(:(val(x)))),
+                return DerivedVar($f(val(x)), GradientCollection(x.system, onehot(AV, $(df(:(val(x)))),
                                                                          x.index, length(system(x).vals))))
             end
         end |> eval
@@ -63,25 +63,14 @@ for i ∈ diffrules()
             $pkg.$f(x::DerivedVar, y::CovariantVar) = $f(x, DerivedVar(y))
 
             function $pkg.$f(x::CovariantVar{T,AV1}, y::CovariantVar{U,AV2}) where {T,AV1,U,AV2}
-                if system(x) === system(y)
-                    return DerivedVar($f(val(x), val(y)),
-                                      Gradients(system(x),
-                                        onehot(AV1, $(df(:(val(x)), :(val(y)))[1]),
-                                               x.index, length(system(x).vals)) .+
-                                        onehot(AV2, $(df(:(val(x)), :(val(y)))[2]),
-                                               y.index, length(system(y).vals))
-                                      ))
-                else
-                    return DerivedVar($f(val(x), val(y)), Gradients(
-                                    Gradients(system(x),
-                                        onehot(AV1, $(df(:(val(x)), :(val(y)))[1]),
-                                               x.index, length(system(x).vals)),
-                                        ),
-                                    system(y),
-                                    onehot(AV2, $(df(:(val(x)), :(val(y)))[2]),
-                                           y.index, length(system(y).vals))
-                                    ))
-                end
+                return DerivedVar($f(val(x), val(y)),
+                                  GradientCollection(system(x),
+                                                     onehot(AV1, $(df(:(val(x)), :(val(y)))[1]),
+                                                            x.index, length(system(x).vals)),
+                                                     system(y),
+                                                     onehot(AV2, $(df(:(val(x)), :(val(y)))[2]),
+                                                            x.index, length(system(y).vals))
+                                                    ))
             end
         end |> eval
     else
