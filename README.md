@@ -5,7 +5,8 @@
 which are described by their
 [covariance matrices](https://en.wikipedia.org/wiki/Covariance_matrix).
 It allows for easy propagation of these uncertainties, thanks to `Julia`'s convenient
-method overloading, even for different covariant systems.
+method overloading, even for different covariant systems and also supports different
+types of floating-point numbers.
 
 ## Usage
 The easiest way to construct a covariant system is with the `@covar_system` macro.
@@ -24,8 +25,6 @@ All basic operations on these variables are supported:
 ```julia
 julia> a^2 + 2b + 1
 f({xᵢ}) = 11.0 ± 2.8284271247461903
-  {∇⃗f} = Array{Float64,1}[[4.0, 2.0]]
-  {Vₘ} = Array{Float64,2}[[0.3 0.1; 0.1 0.4]]
 ```
 
 Operations on `CovariantVars` automatically generate a `DerivedVar`, which contains
@@ -53,24 +52,18 @@ julia> c, d, e = @covar_system [5., 2., 3.] [1.2 .3 .1; .3 .5 .2; .1 .2 .6]
 
 julia> a * c - sin(d + b) * e
 f({xᵢ}) = 12.876772823989416 ± 2.1793998471976033
-  {∇⃗f} = Array{Float64,1}[[5.0, -0.850987], [2.0, -0.850987, 0.958924]]
-  {Vₘ} = Array{Float64,2}[[0.3 0.1; 0.1 0.4], [1.2 0.3 0.1; 0.3 0.5 0.2; 0.1 0.2 0.6]]
 ```
 
 The following also works like you would expect:
 ```julia
 julia> sin(a * c)^2 + cos(c * a)^2
 f({xᵢ}) = 1.0 ± 0.0
-  {∇⃗f} = Array{Float64,1}[[0.0, 0.0], [0.0, 0.0, 0.0]]
-  {Vₘ} = Array{Float64,2}[[0.3 0.1; 0.1 0.4], [1.2 0.3 0.1; 0.3 0.5 0.2; 0.1 0.2 0.6]]
 ```
 
 The methods `val` and `err` return the value or error of either a `CovariantVar` or `DerivedVar`:
 ```julia
 julia> x = a^2 + 3b
 f({xᵢ}) = 13.0 ± 3.286335345030997
-  {∇⃗f} = Array{Float64,1}[[4.0, 3.0]]
-  {Vₘ} = Array{Float64,2}[[0.3 0.1; 0.1 0.4]]
 
 julia> val(x), err(x)
 (13.0, 3.286335345030997)
