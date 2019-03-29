@@ -1,7 +1,7 @@
 import DiffRules: diffrule, diffrules
 
-@inline function merge_systems(newval, x::DerivedVar{T}, y::DerivedVar{U}, dg...) where {T,U}
-    return DerivedVar(newval, linear_combine(dg..., x.grads, y.grads))
+@inline function merge_systems(newval, x::DerivedVar{T}, y::DerivedVar{U}, ∂g_∂x, ∂g_∂y) where {T,U}
+    return DerivedVar(newval, linear_combine(∂g_∂x, ∂g_∂y, x.grads, y.grads))
 end
 
 
@@ -56,7 +56,6 @@ for i ∈ diffrules()
                 return merge_systems($f(val(x), val(y)), x, y,
                                      $(df(:(val(x)), :(val(y)))[1]),
                                      $(df(:(val(x)), :(val(y)))[2]))
-                #return DerivedVar($f(val(x), val(y)), grads, systems)
             end
 
             $pkg.$f(x::CovariantVar, y::DerivedVar) = $f(DerivedVar(x), y)

@@ -25,6 +25,21 @@ end
 
 numvals(x::CovariantSystem) = length(x.vals)
 
+function Base.convert(::Type{CovariantSystem{_,AV,AM}}, cs) where {_,AV,AM}
+    return CovariantSystem(convert(AV, cs.vals), convert(AM, cs.covar))
+end
+
+function Base.convert(::Type{CovariantSystem{T,AV,AM}},
+                      cs::CovariantSystem{T,AV,AM}) where {T,AV,AM}
+    return cs
+end
+
+function Base.promote_rule(::Type{CovariantSystem{T1,AV1,AM1}}, ::Type{CovariantSystem{T2,AV2,AM2}}) where
+    {T1,AV1,AM1,T2,AV2,AM2}
+    return CovariantSystem{promote_type(T1, T2),promote_type(AV1, AV2),promote_type(AM1, AM2)}
+end
+
+
 abstract type CorrelatedVar <: Number end
 
 """
