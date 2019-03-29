@@ -13,8 +13,6 @@ end
 function Gradients(parent::Gradients{K1,V1}, key::K2, val::V2) where {K1,V1,K2,V2}
     K = promote_type(K1, K2)
     V = promote_type(V1, V2)
-    #println("$K2 => $K: $(convert(K, key));  $V2 => $V: $(convert(V, val))")
-    #println("Gradients{$K,$V}: $(convert(Gradients{K,V}, parent))")
     return Gradients(convert(Gradients{K,V}, parent), convert(K, key), convert(V, val))
 end
 
@@ -51,8 +49,9 @@ function Base.convert(::Type{Gradients{K,V}}, g::Gradients{K,V}) where {K,V}
     return g
 end
 
-Base.promote_rule(::Type{Gradients{K1,V1}}, ::Type{Gradients{K2,V2}}) where {K1,V1,K2,V2} =
-    Gradients{promote_type(K1, K2),promote_type(V1, V2)}
+function Base.promote_rule(::Type{Gradients{K1,V1}}, ::Type{Gradients{K2,V2}}) where {K1,V1,K2,V2}
+    return Gradients{promote_type(K1, K2),promote_type(V1, V2)}
+end
 
 
 function linear_combine(∂f_∂g1, ∂f_∂g2, g1::Gradients, g2::Gradients)

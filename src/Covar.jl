@@ -94,7 +94,7 @@ Represents a variable derived from one or multiple CovariantSystems
     grads:   Gradients with respect to the corresponding CovariantSystems
     systems: The underlying CovariantSystems
 """
-struct DerivedVar{T<:AbstractFloat,G<:Gradients#={<:CovariantSystem,<:AbstractVector}=#} <: CorrelatedVar
+struct DerivedVar{T<:AbstractFloat,G<:Gradients} <: CorrelatedVar
     val::T
     grads::G
 end
@@ -112,9 +112,7 @@ end
 err(x::CorrelatedVar) = √var(x)
 
 function Base.show(io::IO, x::DerivedVar)
-    println(io, "f({xᵢ}) = $(val(x)) ± $(err(x))")
-    #println(io, "  {∇⃗f} = $(x.grads)")
-    #print(io, "  {Vₘ} = $([ i.covar for i in x.systems ])")
+    print(io, "f({xᵢ}) = $(val(x)) ± $(err(x))")
 end
 
 
@@ -136,12 +134,10 @@ function onehot(SV::Type{SVector{1,T}}, val, i::Int, len::Int) where {T<:Abstrac
     return SV(val)
 end
 
-#onehot(val, i::Int, len::Int...) = onehot(float(val), i, len...)
-
 function DerivedVar(x::CovariantVar{T,AV}) where {T,AV}
     return DerivedVar(val(x), Gradients(system(x), onehot(AV, one(T), x.index, numvals(system(x)))))
 end
 
 include("rules.jl")
 
-end # module
+end
