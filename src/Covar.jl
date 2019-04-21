@@ -1,9 +1,15 @@
 module Covar
 
-export @covar_system, ⟂, val, var, err, numvals, CorrelatedVar, CovariantVar, DerivedVar,
+export @covar_system,  val, var, err, numvals, CorrelatedVar, CovariantVar, DerivedVar,
        CovariantSystem
 
-using StaticArrays
+const tag_counters = UInt64[1]
+newtag!() = @inbounds tag_counters[Base.Threads.threadid()] += 1
+
+function __init__()
+    nthr = Base.Threads.nthreads()
+    resize!(tag_counters, nthr)[:] = range(UInt64(1), step=typemax(UInt64)÷nthr, length=nthr)
+end
 
 """
 Represents a system of covariant variables
@@ -11,36 +17,31 @@ Represents a system of covariant variables
     vals:   Values of the covariant variables
     covar:  The covariance matrix
 """
-struct CovariantSystem{T<:AbstractFloat,AV<:AbstractVector{T},AM<:AbstractMatrix{T}}
-    vals::AV
-    covar::AM
+struct CovariantSystem{Tval,Tvals<:AbstractVector{Tval},Tcovar<:AbstractMatrix}
+    vals::Tvals
+    covar::Tcovar
+    tag::UInt64
     
-    function CovariantSystem(vals::AV, covar::AM) where
-        {T<:AbstractFloat,AV<:AbstractVector{T},AM<:AbstractMatrix{T}}
-        @assert(size(covar) == length.((vals, vals)),
-                "CovariantSystem has to satisfy: vals ∈ ℝ^n, covar ∈ ℝ^(n×n) where n ∈ ℕ")
-        return new{T,AV,AM}(vals, covar)
+    function CovariantSystem(vals::Tvals, covar::Tcovar) where
+        {Tval,Tvals<:AbstractVector{Tval},Tcovar<:AbstractMatrix}
+        size(covar) == length.((vals, vals)) ||
+            "CovariantSystem has to satisfy: vals ∈ ℝ^n, covar ∈ ℝ^(n×n) where n ∈ ℕ"
+        return new{Tval,Tvals,Tcovar}(vals, covar, newtag!())
     end
 end
 
-numvals(x::CovariantSystem) = length(x.vals)
+abstract type Measurement{T} <: Number end
+abstract type CorrelatedVar{T} <: Measurement{T} end
 
-function Base.convert(::Type{CovariantSystem{_,AV,AM}}, cs) where {_,AV,AM}
-    return CovariantSystem(convert(AV, cs.vals), convert(AM, cs.covar))
+struct IndependentVar{Tval,Terr} <: Measurement{Tval}
+    val::Tval
+    err::Terr
+    tag::UInt64
+
+    function IndependentVar(val::Tval, err::Terr) where {Tval,Terr}
+        return new{Tval,Terr}(val, err, newtag!())
+    end
 end
-
-function Base.convert(::Type{CovariantSystem{T,AV,AM}},
-                      cs::CovariantSystem{T,AV,AM}) where {T,AV,AM}
-    return cs
-end
-
-function Base.promote_rule(::Type{CovariantSystem{T1,AV1,AM1}}, ::Type{CovariantSystem{T2,AV2,AM2}}) where
-    {T1,AV1,AM1,T2,AV2,AM2}
-    return CovariantSystem{promote_type(T1, T2),promote_type(AV1, AV2),promote_type(AM1, AM2)}
-end
-
-
-abstract type CorrelatedVar <: Number end
 
 """
 Represents a variable of a CovariantSystem
@@ -48,22 +49,19 @@ Represents a variable of a CovariantSystem
     index:  Index of the variable in the CovariantSystem
     system: CovariantSystem of the variable
 """
-struct CovariantVar{T<:AbstractFloat,AV<:AbstractVector{T},AM<:AbstractMatrix{T}} <: CorrelatedVar
+struct CovariantVar{Tval,Tvals<:AbstractVector{Tval},Tcovar<:AbstractMatrix} <: CorrelatedVar{Tval}
     index::Int
-    system::CovariantSystem{T,AV,AM}
+    system::CovariantSystem{Tval,Tvals,Tcovar}
 
-    function CovariantVar(index::Int, system::CovariantSystem{T,AV,AM}) where
-        {T<:AbstractFloat,AV<:AbstractVector{T},AM<:AbstractMatrix{T}}
-        @assert index ≤ length(system.vals) "Index of CovariantVar not in range"
-        return new{T,AV,AM}(index, system)
+    function CovariantVar(index::Int, system::CovariantSystem{Tval,Tvals,Tcovar}) where
+        {Tval,Tvals<:AbstractVector{Tval},Tcovar<:AbstractMatrix}
+        index ≤ length(system.vals) || "Index of CovariantVar not in range"
+        return new{Tval,Tvals,Tcovar}(index, system)
     end
 end
 
-system(x::CovariantVar) = x.system
 val(x::CovariantVar) = system(x).vals[x.index]
 var(x::CovariantVar) = system(x).covar[x.index, x.index]
-
-⟂(x::CovariantVar, y::CovariantVar) = x.system !== y.system
 
 """
 Creates a CovariantSystem and returns an Array containing the CovariantVars
@@ -72,10 +70,8 @@ See also: `CovariantSystem`, `CovariantVar`
 """
 macro covar_system(vals, covar)
     return quote
-        begin
-            cs = CovariantSystem($(esc(vals)), $(esc(covar)))
-            CovariantVar.(keys(cs.vals), Ref(cs))
-        end
+        cs = CovariantSystem($(esc(vals)), $(esc(covar)))
+        CovariantVar.(keys(cs.vals), Ref(cs))
     end
 end
 
@@ -85,7 +81,7 @@ function Base.show(io::IO, x::CovariantVar)
 end
 
 
-include("gradients.jl")
+#include("gradients.jl")
 
 """
 Represents a variable derived from one or multiple CovariantSystems
@@ -94,9 +90,21 @@ Represents a variable derived from one or multiple CovariantSystems
     grads:   Gradients with respect to the corresponding CovariantSystems
     systems: The underlying CovariantSystems
 """
-struct DerivedVar{T<:AbstractFloat,G<:Gradients} <: CorrelatedVar
-    val::T
-    grads::G
+struct DerivedVar{isholomorphic,Tval,Targs<:Tuple,Trules<:Tuple} <: CorrelatedVar{Tval}
+    val::Tval
+    args::Targs
+    rules::Trules
+end
+
+@generated function isholomorphic(::Targs, ::Trules) where {Targs,Trules}
+    return !(any(T -> T<:DerivedVar{false}, Targs.parameters) ||
+             any(T -> T<:WirtingerRule, Trules.parameters))
+end
+
+function DerivedVar(val::Tval, args::Targs, rules::Trules) where
+    {Tval,Targs<:Tuple,Trules<:Tuple}
+
+    return DerivedVar{isholomporphic(Targs,Trules),Tval,Targs,Trules}(val, args, rules)
 end
 
 val(x::DerivedVar) = x.val
@@ -115,29 +123,8 @@ function Base.show(io::IO, x::DerivedVar)
     print(io, "f({xᵢ}) = $(val(x)) ± $(err(x))")
 end
 
+include("accumulator.jl")
 
-
-function onehot(::Type{AV}, val, i::Int, len::Int) where
-    {T<:AbstractFloat,AV<:AbstractVector{T}}
-    a = zeros(T, len)
-    @inbounds a[i] = val
-    return a
-end
-
-function onehot(SV::Type{SVector{N,T}}, val, i::Int, len::Int) where {N,T<:AbstractFloat}
-    a = zeros(MVector{N,T})
-    @inbounds a[i] = val
-    return SVector(a)
-end
-
-function onehot(SV::Type{SVector{1,T}}, val, i::Int, len::Int) where {T<:AbstractFloat}
-    return SV(val)
-end
-
-function DerivedVar(x::CovariantVar{T,AV}) where {T,AV}
-    return DerivedVar(val(x), Gradients(system(x), onehot(AV, one(T), x.index, numvals(system(x)))))
-end
-
-include("rules.jl")
+#include("rules.jl")
 
 end
